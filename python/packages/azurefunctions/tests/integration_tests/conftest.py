@@ -5,6 +5,7 @@ Pytest configuration for Durable Agent Framework tests.
 This module provides fixtures and configuration for pytest.
 """
 
+import logging
 import subprocess
 import sys
 from collections.abc import Iterator, Mapping
@@ -14,10 +15,12 @@ from typing import Any
 import pytest
 import requests
 
+logger = logging.getLogger(__name__)
+
 # Add the integration_tests directory to the path so testutils can be imported
 sys.path.insert(0, str(Path(__file__).parent))
 
-from testutils import (
+from testutils import (  # noqa: E402
     FunctionAppStartupError,
     build_base_url,
     cleanup_function_app,
@@ -90,22 +93,34 @@ def function_app_for_test(request: pytest.FixtureRequest) -> Iterator[dict[str, 
     max_attempts = 3
     last_error: Exception | None = None
     func_process: subprocess.Popen[Any] | None = None
+    log_file: Any = None
     base_url = ""
     port = 0
 
     for _ in range(max_attempts):
         port = find_available_port()
         base_url = build_base_url(port)
-        func_process = start_function_app(sample_path, port)
+        func_process, log_file = start_function_app(sample_path, port)
 
         try:
             wait_for_function_app_ready(func_process, port)
             last_error = None
             break
         except FunctionAppStartupError as exc:
-            last_error = exc
+            log_file.seek(0)
+            logs = log_file.read().decode("utf-8", errors="replace")
+            last_error = FunctionAppStartupError(f"{exc}\nLogs:\n{logs}")
             cleanup_function_app(func_process)
+            log_file.close()
             func_process = None
+            log_file = None
+        except BaseException:
+            # Capture logs on timeout or other interruptions
+            if log_file:
+                log_file.seek(0)
+                logs = log_file.read().decode("utf-8", errors="replace")
+                logger.info("[Startup Interrupted] Partial Logs:\n%s", logs)
+            raise
 
     if func_process is None:
         error_message = f"Function app failed to start after {max_attempts} attempt(s)."
@@ -118,6 +133,12 @@ def function_app_for_test(request: pytest.FixtureRequest) -> Iterator[dict[str, 
     finally:
         if func_process is not None:
             cleanup_function_app(func_process)
+        if log_file is not None:
+            log_file.seek(0)
+            logger.info("\n=== Function App Logs ===")
+            logger.info(log_file.read().decode("utf-8", errors="replace"))
+            logger.info("=========================")
+            log_file.close()
 
 
 @pytest.fixture(scope="module")

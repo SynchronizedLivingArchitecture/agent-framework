@@ -9,6 +9,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from contextlib import suppress
@@ -294,11 +295,11 @@ def load_and_validate_env() -> None:
         )
 
 
-def start_function_app(sample_path: Path, port: int) -> subprocess.Popen:
+def start_function_app(sample_path: Path, port: int) -> tuple[subprocess.Popen, Any]:
     """
     Start a function app in the specified sample directory.
 
-    Returns the subprocess.Popen object for the running process.
+    Returns the subprocess.Popen object and the log file handle.
     """
     env = os.environ.copy()
     # Use a unique TASKHUB_NAME for each test run to ensure test isolation.
@@ -306,18 +307,30 @@ def start_function_app(sample_path: Path, port: int) -> subprocess.Popen:
     # use the task hub name to separate orchestration state.
     env["TASKHUB_NAME"] = f"test{uuid.uuid4().hex[:8]}"
 
+    log_file = tempfile.TemporaryFile()  # noqa: SIM115
+
     # On Windows, use CREATE_NEW_PROCESS_GROUP to allow proper termination
     # shell=True only on Windows to handle PATH resolution
     if sys.platform == "win32":
-        return subprocess.Popen(
-            ["func", "start", "--port", str(port)],
+        process = subprocess.Popen(
+            ["func", "start", "--verbose", "--port", str(port)],
             cwd=str(sample_path),
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
             shell=True,
             env=env,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
         )
+        return process, log_file
     # On Unix, don't use shell=True to avoid shell wrapper issues
-    return subprocess.Popen(["func", "start", "--port", str(port)], cwd=str(sample_path), env=env)
+    process = subprocess.Popen(
+        ["func", "start", "--verbose", "--port", str(port)],
+        cwd=str(sample_path),
+        env=env,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+    )
+    return process, log_file
 
 
 def wait_for_function_app_ready(func_process: subprocess.Popen, port: int, max_wait: int = 60) -> None:
