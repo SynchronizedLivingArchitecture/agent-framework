@@ -19,6 +19,10 @@ from ._checkpoint import (
     InMemoryCheckpointStorage,
     WorkflowCheckpoint,
 )
+from ._checkpoint_encoding import (
+    decode_checkpoint_value,
+    encode_checkpoint_value,
+)
 from ._checkpoint_summary import WorkflowCheckpointSummary, get_checkpoint_summary
 from ._concurrent import ConcurrentBuilder
 from ._const import (
@@ -139,9 +143,11 @@ __all__ = [
     "CheckpointStorage",
     "ConcurrentBuilder",
     "Default",
+    "decode_checkpoint_value",
     "Edge",
     "EdgeCondition",
     "EdgeDuplicationError",
+    "encode_checkpoint_value",
     "Executor",
     "ExecutorCompletedEvent",
     "ExecutorEvent",
