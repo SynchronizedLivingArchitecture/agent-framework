@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using Microsoft.Agents.AI.DurableTask;
+using Microsoft.Agents.AI.DurableTask.Workflows;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Azure.Functions.Worker.Core.FunctionMetadata;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,24 @@ namespace Microsoft.Agents.AI.Hosting.AzureFunctions;
 /// </summary>
 public static class FunctionsApplicationBuilderExtensions
 {
+    /// <summary>
+    /// Configures durable workflow services for the application and allows customization of durable workflow options.
+    /// </summary>
+    /// <remarks>This method registers the services required for durable workflows using
+    /// Microsoft.DurableTask.Workflows. Call this method during application startup to enable durable workflows in your
+    /// Azure Functions app.</remarks>
+    /// <param name="builder">The application builder used to configure services and middleware for the Azure Functions app.</param>
+    /// <param name="configure">A delegate that is used to configure the durable workflow options. Cannot be null.</param>
+    /// <returns>The same <see cref="FunctionsApplicationBuilder"/> instance that this method was called on, to support method
+    /// chaining.</returns>
+    public static FunctionsApplicationBuilder ConfigureDurableWorkflows(this FunctionsApplicationBuilder builder, Action<DurableWorkflowOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        // The main durable workflows services registration is done in Microsoft.DurableTask.Workflows.
+        builder.Services.ConfigureDurableWorkflows(configure);
+        return builder;
+    }
+
     /// <summary>
     /// Configures the application to use durable agents with a builder pattern.
     /// </summary>
